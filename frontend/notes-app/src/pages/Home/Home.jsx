@@ -4,8 +4,14 @@ import NoteCard from "../../components/Cards/NoteCard";
 import { MdAdd } from "react-icons/md";
 import AddEditNotes from "./AddEditNotes";
 import Modal from "react-modal";
+Modal.setAppElement("#root");
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../utils/axiosInstance";
+import Toast from "../../components/ToastMessage/Toast";
+import EmptyCard from "../../components/Cards/EmptyCard.jsx/EmptyCard";
+import AddNotesImg from "../../assets/images/add_notes.svg"
+import NoDataImg from "../../assets/images/database_off.svg"
+
 // import { data } from "react-router-dom";
 
 const Home = () => {
@@ -16,11 +22,38 @@ const Home = () => {
     data: null,
   });
 
+  const [showToastMsg, setShowToastMsg] = useState ({
+    isShown: false,
+    message: "",
+    type: "add",
+  })
+
   const [allNotes, setAllNotes] = useState([]);
   const [userInfo, setUserInfo] = useState(null);
 
+  const [isSearch, setIsSearch] = useState(false);
+
 
   const navigate = useNavigate();
+
+  const handleEdit = (noteDetails) => {
+    setOpenAddEditModal({isShown: true, data: noteDetails, type: "edit"});
+  };
+
+  const showToastMessage = (message, type) => {
+    setShowToastMsg({
+      isShown: true,
+      message,
+      type,
+    })
+  }
+
+  const handleCloseToast = () => {
+    setShowToastMsg({
+      isShown: false,
+      message: "",
+    });
+  };
 
   // Get User Info
   const getUserInfo = useCallback(async () => {
@@ -60,11 +93,75 @@ const Home = () => {
     return () => {};
   },[getAllNotes, getUserInfo]);
   
-  // self added
-  // Handle Add/Edit Modal Open
-  const openModal = (type = "add", data = null) => {
-    setOpenAddEditModal({isShown: true, type, data});
+
+  // Delete Note
+  const deleteNote = async (data) => {
+    const noteId = data._id
+
+     try {
+      const response = await axiosInstance.delete("/delete-note/" + noteId);
+
+      if (response.data && !response.data.error) {
+        showToastMessage("Note Deleted Successfully", 'delete');
+        getAllNotes();
+      }
+    } catch (error) {
+      if(
+        error.response &&
+        error.response.data &&
+        error.response.data.message
+      ) {
+        console.log("An unexpected error occurred. Please try again.");
+      }
+    }
+  }
+
+  // Search for a Note
+  const onSearchNote = async (query) => {
+    try {
+      const response = await axiosInstance.get("/search-notes", {
+        params: {query},
+      });
+
+      if(response.data && response.data.notes) {
+        setIsSearch(true);
+        setAllNotes(response.data.notes);
+      }
+    } catch (error) {
+      console.log(error);
+    }
   };
+
+  // Update isPinned
+  const updateIsPinned = async (noteData) => {
+    const noteId = noteData._id
+
+    try {
+      const response = await axiosInstance.put(
+        "/update-note-pinned/" + noteId, 
+        {
+          isPinned: !noteData.isPinned,
+       }
+      );
+      
+      if(response.data && response.data.note) {
+        showToastMessage("Note Updated Successfully");
+        getAllNotes();
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  const handleClearSearch = () => {
+    setIsSearch(false);
+    getAllNotes();
+  };
+  // // self added
+  // // Handle Add/Edit Modal Open
+  // const openModal = (type = "add", data = null) => {
+  //   setOpenAddEditModal({isShown: true, type, data});
+  // };
 
   // Handle Add/Edit Modal Close
   const closeModal = () => {
@@ -73,12 +170,17 @@ const Home = () => {
 
   return (
     <>
-      <Navbar userInfo={userInfo} />
+      <Navbar 
+        userInfo={userInfo} 
+        onSearchNote={onSearchNote} 
+        handleClearSearch={handleClearSearch} 
+      />
+
 {/* p-6 or container mx-auto */}
       <div className="p-6">  
         <div className="grid grid-cols-3 gap-4 mt-8">
           { allNotes.length > 0 ? (
-            allNotes.map((note) => (
+            allNotes.map((note, index) => (
               <NoteCard
                 key={note._id}
                 title={note.title}
@@ -86,13 +188,16 @@ const Home = () => {
                 content={note.content}
                 tags={note.tags}
                 isPinned={note.isPinned}
-                onEdit={() => openModal("edit", note)}
-                onDelete={() => {}}
-                onPinNote={() => {}}
+                onEdit={() => handleEdit(note)}
+                onDelete={() => deleteNote(note)}
+                onPinNote={() => updateIsPinned(note)}
               />
             ))
           ):(
-            <p>No notes found.</p>
+            <EmptyCard 
+              imgSrc={isSearch ? NoDataImg : AddNotesImg } 
+              message={isSearch ? `No notes found matching your search` :`Start creating your first note! Click the 'Add' button to jot down your
+            thoughts, ideas, and reminders.  Let's get started!`} />
           )}
         </div>
       </div>
@@ -123,8 +228,17 @@ const Home = () => {
           type={openAddEditModal.type}
           noteData={openAddEditModal.data}
           onClose={closeModal}  //
+          getAllNotes = {getAllNotes}
+          showToastMessage= {showToastMessage}
         />
       </Modal>
+
+      <Toast
+        isShown={showToastMsg.isShown}
+        message={showToastMsg.message}
+        type={showToastMsg.type}
+        onClose={handleCloseToast}
+      />
 
     </>
   );

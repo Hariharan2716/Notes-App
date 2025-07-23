@@ -44,7 +44,7 @@ const SignUp = () => {
       });
 
       // Handle successful registration response
-      if(response.data && response.accessToken) {
+      if(response.data && response.data.error) {
         setError(response.data.message);
         return
       }
