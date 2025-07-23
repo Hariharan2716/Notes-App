@@ -180,7 +180,7 @@ const Home = () => {
       <div className="p-6">  
         <div className="grid grid-cols-3 gap-4 mt-8">
           { allNotes.length > 0 ? (
-            allNotes.map((note, index) => (
+            allNotes.map((note) => (
               <NoteCard
                 key={note._id}
                 title={note.title}
